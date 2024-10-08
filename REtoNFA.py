@@ -7,6 +7,10 @@ class Transitions:
     def __str__(self):
         return f"({self.start}, {self.symbol}) -> {self.end}"
 
+## helper function to sort transtions by their numerical state
+def getNumState(state):
+    return int(state[1:])
+
 class NFA:
     def __init__(self, startState, acceptState):
         self.startState = startState
@@ -15,10 +19,10 @@ class NFA:
 
     def addTransition(self, start, symbol, end):
         self.transitions.append(Transitions(start,symbol,end))
-    
+
     def __str__(self):
-        #sorts transitions based on their start state
-        sortedTransitions = sorted(self.transitions, key=lambda t: (t.start, t.symbol, t.end))
+        #sorts transitions based on their start state then symbol then end state
+        sortedTransitions = sorted(self.transitions, key=lambda t: (getNumState(t.start), t.symbol, getNumState(t.end)))
         transitionStr = "\n".join(str(t) for t in sortedTransitions)
         return f"Start: {self.startState}\nAccept: {self.acceptState}\n{transitionStr}"
 
@@ -27,18 +31,20 @@ def createNFA(symbol, stateCounter):
     acceptState = f'q{stateCounter + 1}'
     nfa = NFA(startState, acceptState)
     nfa.addTransition(startState, symbol, acceptState)
-    print(f"Created NFA for symbol '{symbol}': start={startState}, accept={acceptState}")
+    #print(f"created nfa for symbol '{symbol}': start={startState}, accept={acceptState}") #DEBUG
     return nfa, stateCounter + 2
 
-#concatenates 2 NFAs by adding a epsilon transition from the accept state of NFA1 to the start state of NFA2
+#concatenates 2 nfas by adding a epsilon transition from the accept state of nfa1 to the start state of nfa2
 def concatenateNFA(nfa1, nfa2):
-    print(f"Concatenating NFA1: start={nfa1.startState}, accept={nfa1.acceptState} with NFA2: start={nfa2.startState}, accept={nfa2.acceptState}")
+    
+    #print(f"concatenate nfa1: start={nfa1.startState}, accept={nfa1.acceptState} with nfa2: start={nfa2.startState}, accept={nfa2.acceptState}") #DEBUG
 
     nfa1.addTransition(nfa1.acceptState, 'E', nfa2.startState)
     #updates accept state
     nfa1.acceptState = nfa2.acceptState
     nfa1.transitions += nfa2.transitions
-    print(f"After concatenation: new accept={nfa1.acceptState}")
+    
+    #print(f"After concatenation: new accept={nfa1.acceptState}") #DEBUG
 
     return nfa1
 
@@ -46,6 +52,11 @@ def unionNFA(nfa1, nfa2, stateCounter):
     #creates new start and accept state
     startState = f'q{stateCounter}'
     acceptState = f'q{stateCounter + 1}'
+
+    #print(f"DEBUG: union: creating new start state {startState} and accept state {acceptState}")
+    #print(f"DEBUG: union: linking {startState} to {nfa1.startState} and {nfa2.startState}")
+    #print(f"DEBUG: union: linking {nfa1.acceptState} and {nfa2.acceptState} to {acceptState}")
+
     updatedNFA = NFA(startState, acceptState)
 
     #adds epsilon transitions from new start state to nfa1 and nfa2 start states
@@ -58,26 +69,30 @@ def unionNFA(nfa1, nfa2, stateCounter):
 
     #combines transitions from nfa1 and nfa2s
     updatedNFA.transitions += nfa1.transitions + nfa2.transitions
-    print(f"Union NFA created: start={startState}, accept={acceptState}")
+    
+    #print(f"union nfa created: start={startState}, accept={acceptState}") #DEBUG
 
     return updatedNFA, stateCounter + 2
 
 def kleeneStarNFA(nfa, stateCounter):
     #creates new start and accept state
     startState = f'q{stateCounter}'
-    acceptState = f'q{stateCounter + 1}'
+    acceptState = startState
     updatedNFA = NFA(startState, acceptState)
+
+    #print(f"DEBUG: applying * to nfa with start state {nfa.startState} and accept state {nfa.acceptState}")
+    #print(f"DEBUG: creating new start state {startState} and accept state {acceptState}")
 
     #adds epsilon transitions
     updatedNFA.addTransition(startState, 'E', nfa.startState)
-    updatedNFA.addTransition(startState, 'E', acceptState)
-    updatedNFA.addTransition(nfa.acceptState, 'E', nfa.startState)
-    updatedNFA.addTransition(nfa.acceptState, 'E', acceptState)
+    updatedNFA.addTransition(nfa.acceptState, 'E', startState)
+    
     #combines transitions
     updatedNFA.transitions += nfa.transitions
-    print(f"Kleene star NFA created: start={startState}, accept={acceptState}")
+    
+    #DEBUG print(f"* nfa created: start={startState}, accept={acceptState}")
 
-    return updatedNFA, stateCounter + 2
+    return updatedNFA, stateCounter + 1
 
 def processPostfixExpression(expr):
     stack = []
@@ -91,7 +106,7 @@ def processPostfixExpression(expr):
             sys.exit(1)
 
         if char in {'a', 'b', 'c', 'd', 'e', 'E'}:
-            #create an NFA for a single symbol and update the state counter
+            #create an nfa for a single symbol and update the state counter
             nfa, stateCounter = createNFA(char, stateCounter)
             stack.append(nfa)
         elif char == '&':
@@ -111,7 +126,6 @@ def processPostfixExpression(expr):
             new_nfa, stateCounter = unionNFA(nfa1, nfa2, stateCounter)
             stack.append(new_nfa)
         elif char == '*':
-            # kleene star creates two new states, so stateCounter is incremented
             if len(stack) < 1:
                 print("Error: Malformed input")
                 sys.exit(1)
@@ -123,10 +137,8 @@ def processPostfixExpression(expr):
         print("Error: Malformed input")
         sys.exit(1)
 
-    #returns the new NFA
-    final_nfa = stack.pop()
-    print(f"Final NFA created with start={final_nfa.startState} and accept={final_nfa.acceptState}")
-    return final_nfa
+    #returns the new nfa
+    return stack.pop()
 
 def main(input_file):
     try:
